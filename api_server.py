@@ -166,6 +166,12 @@ def predict_blood_pressure():
         patient_info = data.get('patient', {})
         bp_data = data.get('answers', {})
 
+        def parse_binary(val):
+            """Safely converts Yes/No strings OR 0/1 integers to int."""
+            if val is None: return 0
+            if isinstance(val, (int, float)): return int(val)
+            return 1 if str(val).strip().lower() in ('yes', '1', 'true') else 0
+
         age = float(patient_info.get('age') or 45)
         sys_bp   = float(bp_data.get('sysBP', 120))
         dia_bp   = float(bp_data.get('diaBP', 80))
@@ -174,9 +180,9 @@ def predict_blood_pressure():
         glucose  = float(bp_data.get('glucose', 90))
         chol     = float(bp_data.get('totChol', 200))
         cigs     = float(bp_data.get('cigsPerDay', 0))
-        smoker   = int(bp_data.get('currentSmoker', 0))
-        diabetes = int(bp_data.get('diabetes', 0))
-        bp_meds  = int(bp_data.get('BPMeds', 0))
+        smoker   = parse_binary(bp_data.get('currentSmoker', 0))
+        diabetes = parse_binary(bp_data.get('diabetes', 0))
+        bp_meds  = parse_binary(bp_data.get('BPMeds', 0))
 
         input_df = pd.DataFrame([{
             'age': age, 'sysBP': sys_bp, 'diaBP': dia_bp, 'BMI': bmi,
@@ -235,6 +241,21 @@ def predict_cardio():
         patient_info = data.get('patient', {})
         cardio_data = data.get('answers', {})
 
+        def parse_binary(val):
+            """Safely converts Yes/No strings OR 0/1 integers to int."""
+            if val is None: return 0
+            if isinstance(val, (int, float)): return int(val)
+            return 1 if str(val).strip().lower() in ('yes', '1', 'true') else 0
+
+        def parse_level(val, default=1):
+            """Converts Normal/Above Normal/Well Above Normal to 1/2/3."""
+            if val is None: return default
+            if isinstance(val, (int, float)): return int(val)
+            v = str(val).strip().lower()
+            if 'well' in v: return 3
+            if 'above' in v: return 2
+            return 1  # Normal
+
         age_years  = float(patient_info.get('age') or 45)
         height     = float(patient_info.get('height') or 170)
         weight     = float(patient_info.get('weight') or 70)
@@ -243,11 +264,11 @@ def predict_cardio():
 
         ap_hi       = float(cardio_data.get('ap_hi', 120))
         ap_lo       = float(cardio_data.get('ap_lo', 80))
-        cholesterol = int(cardio_data.get('cholesterol', 1))
-        gluc        = int(cardio_data.get('gluc', 1))
-        smoke       = int(cardio_data.get('smoke', 0))
-        alco        = int(cardio_data.get('alco', 0))
-        active      = int(cardio_data.get('active', 1))
+        cholesterol = parse_level(cardio_data.get('cholesterol', 1))
+        gluc        = parse_level(cardio_data.get('gluc', 1))
+        smoke       = parse_binary(cardio_data.get('smoke', 0))
+        alco        = parse_binary(cardio_data.get('alco', 0))
+        active      = parse_binary(cardio_data.get('active', 1))
 
         bmi = weight / ((height / 100) ** 2) if height > 0 else 25.0
         pulse_pressure = ap_hi - ap_lo
