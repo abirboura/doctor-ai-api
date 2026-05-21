@@ -49,8 +49,12 @@ def load_model(filename):
     return None
 
 diabetes_model = load_model('best_diabetes_model.pkl')
-bp_model = load_model('best_model.pkl')
-cardio_model = load_model('cardio_model.pkl')
+bp_model       = load_model('best_model.pkl')
+cardio_model   = load_model('cardio_model.pkl')
+calcium_model  = load_model('model_calcium.pkl')   # ← جديد
+b12_model      = load_model('model_b12.pkl')        # ← جديد
+vdd_model      = load_model('model_vdd.pkl')        # ← جديد
+anemia_model   = load_model('model_anemia.pkl')     # ← جديد
 
 # ==========================================
 # ROUTES
@@ -61,9 +65,13 @@ def health_check():
     return jsonify({
         "status": "active",
         "models_loaded": {
-            "diabetes": diabetes_model is not None,
+            "diabetes":       diabetes_model is not None,
             "blood_pressure": bp_model is not None,
-            "cardio": cardio_model is not None
+            "cardio":         cardio_model is not None,
+            "calcium":        calcium_model is not None,
+            "b12":            b12_model is not None,
+            "vitamin_d":      vdd_model is not None,
+            "anemia":         anemia_model is not None,
         }
     })
 
@@ -167,7 +175,6 @@ def predict_blood_pressure():
         bp_data = data.get('answers', {})
 
         def parse_binary(val):
-            """Safely converts Yes/No strings OR 0/1 integers to int."""
             if val is None: return 0
             if isinstance(val, (int, float)): return int(val)
             return 1 if str(val).strip().lower() in ('yes', '1', 'true') else 0
@@ -206,15 +213,15 @@ def predict_blood_pressure():
         risk_pct = round(prob * 100, 1)
 
         if risk_pct < 20:
-            diagnosis = f"Low Risk"
+            diagnosis = "Low Risk"
             advice = "• Maintain a balanced, low-sodium diet.\n• Exercise regularly (at least 30 min/day).\n• Monitor blood pressure at home periodically."
             is_high_risk = False
         elif risk_pct < 50:
-            diagnosis = f"Moderate Risk"
+            diagnosis = "Moderate Risk"
             advice = "• Reduce salt and processed food intake.\n• Check blood pressure at least weekly.\n• Discuss results with your healthcare provider."
             is_high_risk = False
         else:
-            diagnosis = f"High Risk"
+            diagnosis = "High Risk"
             advice = "• Consult a cardiologist as soon as possible.\n• Strictly follow any prescribed BP medications.\n• Adopt a DASH diet and avoid smoking immediately."
             is_high_risk = True
 
@@ -242,19 +249,17 @@ def predict_cardio():
         cardio_data = data.get('answers', {})
 
         def parse_binary(val):
-            """Safely converts Yes/No strings OR 0/1 integers to int."""
             if val is None: return 0
             if isinstance(val, (int, float)): return int(val)
             return 1 if str(val).strip().lower() in ('yes', '1', 'true') else 0
 
         def parse_level(val, default=1):
-            """Converts Normal/Above Normal/Well Above Normal to 1/2/3."""
             if val is None: return default
             if isinstance(val, (int, float)): return int(val)
             v = str(val).strip().lower()
             if 'well' in v: return 3
             if 'above' in v: return 2
-            return 1  # Normal
+            return 1
 
         age_years  = float(patient_info.get('age') or 45)
         height     = float(patient_info.get('height') or 170)
@@ -274,20 +279,20 @@ def predict_cardio():
         pulse_pressure = ap_hi - ap_lo
         map_val = (ap_hi + 2 * ap_lo) / 3
 
-        if age_years < 35: age_group = 1
+        if age_years < 35:   age_group = 1
         elif age_years < 45: age_group = 2
         elif age_years < 55: age_group = 3
         elif age_years < 65: age_group = 4
-        else: age_group = 5
+        else:                age_group = 5
 
-        if bmi < 18.5: bmi_category = 1
-        elif bmi < 25.0: bmi_category = 2
-        elif bmi < 30.0: bmi_category = 3
-        else: bmi_category = 4
+        if bmi < 18.5:    bmi_category = 1
+        elif bmi < 25.0:  bmi_category = 2
+        elif bmi < 30.0:  bmi_category = 3
+        else:             bmi_category = 4
 
         hypertension = 1 if (ap_hi >= 140 or ap_lo >= 90) else 0
         age_chol = age_years * cholesterol
-        bp_age = ap_hi * age_years
+        bp_age   = ap_hi * age_years
 
         input_df = pd.DataFrame([{
             'age_years': age_years, 'gender': gender, 'height': height, 'weight': weight,
@@ -315,15 +320,15 @@ def predict_cardio():
         risk_pct = round(prob * 100, 1)
 
         if risk_pct < 20:
-            diagnosis = f"Low Risk"
+            diagnosis = "Low Risk"
             advice = "• Keep up your healthy lifestyle.\n• Maintain regular light exercise (30+ min/day)."
             is_high_risk = False
         elif risk_pct < 50:
-            diagnosis = f"Moderate Risk"
+            diagnosis = "Moderate Risk"
             advice = "• Reduce saturated fats and processed foods.\n• Consult your doctor about your cardiovascular health."
             is_high_risk = False
         else:
-            diagnosis = f"High Risk"
+            diagnosis = "High Risk"
             advice = "• Consult a cardiologist as soon as possible.\n• Strictly manage blood pressure, cholesterol & weight."
             is_high_risk = True
 
@@ -340,6 +345,222 @@ def predict_cardio():
         return jsonify({"error": str(e)}), 400
 
 
+# ==========================================
+# SHARED HELPER — base symptoms + patient info
+# ==========================================
+def get_base_inputs(data):
+    patient = data.get('patient', {})
+    answers = data.get('answers', {})
+    weight  = float(patient.get('weight') or 70)
+    height  = float(patient.get('height') or 170)
+    bmi     = weight / ((height / 100) ** 2) if height > 0 else 25.0
+    base = {
+        'fatigue':     int(answers.get('fatigue',     0)),
+        'hair_loss':   int(answers.get('hair_loss',   0)),
+        'dizziness':   int(answers.get('dizziness',   0)),
+        'muscle_pain': int(answers.get('muscle_pain', 0)),
+        'numbness':    int(answers.get('numbness',    0)),
+        'Age':         float(patient.get('age') or 30),
+        'BMI':         round(bmi, 2),
+    }
+    return base, answers, bmi
+
+
+# ==========================================
+# NEW ROUTE — Calcium
+# ==========================================
+@app.route('/predict/calcium', methods=['POST'])
+def predict_calcium():
+    if not calcium_model:
+        return jsonify({"error": "Calcium model not loaded on server."}), 500
+    try:
+        base, answers, _ = get_base_inputs(request.json)
+        base['calcium'] = float(answers.get('calcium', 9.5))
+        input_df = pd.DataFrame([base])
+
+        if hasattr(calcium_model, 'predict_proba'):
+            prob = float(calcium_model.predict_proba(input_df)[0][1])
+        else:
+            prob = float(calcium_model.predict(input_df)[0])
+
+        risk_pct = round(prob * 100, 1)
+
+        if risk_pct < 30:
+            diagnosis    = "Normal - Calcium levels likely adequate"
+            advice       = "• Maintain a calcium-rich diet (dairy, leafy greens).\n• Ensure adequate Vitamin D intake to aid absorption.\n• Stay physically active to support bone health."
+            is_high_risk = False
+        elif risk_pct < 60:
+            diagnosis    = "Moderate Risk - Possible Calcium Deficiency"
+            advice       = "• Increase dietary calcium (milk, cheese, broccoli, almonds).\n• Check Vitamin D levels as deficiency reduces calcium absorption.\n• Consult your doctor for a blood calcium test."
+            is_high_risk = False
+        else:
+            diagnosis    = "High Risk - Calcium Deficiency Likely"
+            advice       = "• Consult a doctor immediately for a full calcium panel.\n• Consider calcium supplements under medical supervision.\n• Avoid excessive caffeine and sodium which deplete calcium."
+            is_high_risk = True
+
+        return jsonify({
+            "risk_percentage": risk_pct,
+            "diagnosis":       diagnosis,
+            "advice":          advice,
+            "is_high_risk":    is_high_risk,
+            "model_info":      "Cloud Calcium Model"
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 400
+
+
+# ==========================================
+# NEW ROUTE — Vitamin B12
+# ==========================================
+@app.route('/predict/b12', methods=['POST'])
+def predict_b12():
+    if not b12_model:
+        return jsonify({"error": "B12 model not loaded on server."}), 500
+    try:
+        base, answers, _ = get_base_inputs(request.json)
+        base['vitamin_b12'] = float(answers.get('vitamin_b12', 300.0))
+        input_df = pd.DataFrame([base])
+
+        if hasattr(b12_model, 'predict_proba'):
+            prob = float(b12_model.predict_proba(input_df)[0][1])
+        else:
+            prob = float(b12_model.predict(input_df)[0])
+
+        risk_pct = round(prob * 100, 1)
+
+        if risk_pct < 30:
+            diagnosis    = "Normal - Vitamin B12 levels likely adequate"
+            advice       = "• Continue eating B12-rich foods (meat, eggs, dairy).\n• If vegetarian/vegan, consider a B12 supplement.\n• Recheck annually if you follow a plant-based diet."
+            is_high_risk = False
+        elif risk_pct < 60:
+            diagnosis    = "Moderate Risk - Possible B12 Deficiency"
+            advice       = "• Increase intake of B12 sources: fish, poultry, eggs, fortified cereals.\n• Consider a B-complex supplement.\n• Get a serum B12 blood test to confirm levels."
+            is_high_risk = False
+        else:
+            diagnosis    = "High Risk - Vitamin B12 Deficiency Likely"
+            advice       = "• Consult a doctor for a serum B12 test immediately.\n• B12 injections or high-dose supplements may be required.\n• Untreated B12 deficiency can cause nerve damage — act promptly."
+            is_high_risk = True
+
+        return jsonify({
+            "risk_percentage": risk_pct,
+            "diagnosis":       diagnosis,
+            "advice":          advice,
+            "is_high_risk":    is_high_risk,
+            "model_info":      "Cloud B12 Model"
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 400
+
+
+# ==========================================
+# NEW ROUTE — Vitamin D
+# ==========================================
+@app.route('/predict/vdd', methods=['POST'])
+def predict_vdd():
+    if not vdd_model:
+        return jsonify({"error": "Vitamin D model not loaded on server."}), 500
+    try:
+        base, answers, _ = get_base_inputs(request.json)
+        base['Vitamin D Level (ng/mL)']  = float(answers.get('vitamin_d_level',    25.0))
+        base['Dietary Vitamin D (IU)']   = float(answers.get('dietary_vitamin_d', 400.0))
+        base['Dietary Calcium (mg)']     = float(answers.get('dietary_calcium',   800.0))
+        base['Sun Exposure (hours/week)']= float(answers.get('sun_exposure',        5.0))
+        base['calcium']                  = float(answers.get('calcium',             9.5))
+        input_df = pd.DataFrame([base])
+
+        if hasattr(vdd_model, 'predict_proba'):
+            probas     = vdd_model.predict_proba(input_df)[0]
+            predicted  = int(np.argmax(probas))
+            confidence = round(float(probas[predicted]) * 100, 1)
+        else:
+            predicted  = int(vdd_model.predict(input_df)[0])
+            confidence = 100.0
+
+        level_map = {
+            0: {"diagnosis": "Sufficient - Vitamin D levels are adequate",
+                "advice": "• Great! Keep getting regular sun exposure.
+• Maintain a diet with fatty fish, eggs, and fortified foods.
+• Recheck levels annually.",
+                "is_high_risk": False},
+            1: {"diagnosis": "Insufficient - Vitamin D slightly low",
+                "advice": "• Increase sun exposure to 15-30 min/day.
+• Eat more Vitamin D-rich foods (salmon, tuna, fortified milk).
+• Consider a low-dose supplement (400-800 IU/day).",
+                "is_high_risk": False},
+            2: {"diagnosis": "Deficient - Vitamin D deficiency detected",
+                "advice": "• Consult your doctor for a 25-OH Vitamin D blood test.
+• A supplement of 1000-2000 IU/day is commonly recommended.
+• Maximize safe sun exposure and dietary sources.",
+                "is_high_risk": True},
+            3: {"diagnosis": "Severely Deficient - Critical Vitamin D levels",
+                "advice": "• See a doctor immediately — severe deficiency affects bones, immunity and muscles.
+• High-dose supplementation (up to 50,000 IU/week) may be prescribed.
+• Regular monitoring of blood levels is essential.",
+                "is_high_risk": True},
+        }
+        result = level_map.get(predicted, level_map[0])
+
+        return jsonify({
+            "predicted_class": predicted,
+            "confidence":      confidence,
+            "diagnosis":       result["diagnosis"],
+            "advice":          result["advice"],
+            "is_high_risk":    result["is_high_risk"],
+            "model_info":      "Cloud Vitamin D Model"
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 400
+
+
+# ==========================================
+# NEW ROUTE — Anemia
+# ==========================================
+@app.route('/predict/anemia', methods=['POST'])
+def predict_anemia():
+    if not anemia_model:
+        return jsonify({"error": "Anemia model not loaded on server."}), 500
+    try:
+        base, answers, _ = get_base_inputs(request.json)
+        base['Hemoglobin'] = float(answers.get('Hemoglobin', 13.5))
+        base['MCHC']       = float(answers.get('MCHC',       32.0))
+        base['MCV']        = float(answers.get('MCV',        85.0))
+        base['ferritin']   = float(answers.get('ferritin',   50.0))
+        input_df = pd.DataFrame([base])
+
+        if hasattr(anemia_model, 'predict_proba'):
+            prob = float(anemia_model.predict_proba(input_df)[0][1])
+        else:
+            prob = float(anemia_model.predict(input_df)[0])
+
+        risk_pct = round(prob * 100, 1)
+
+        if risk_pct < 30:
+            diagnosis    = "Normal - No signs of Anemia"
+            advice       = "• Maintain a balanced diet rich in iron (red meat, spinach, legumes).\n• Ensure adequate Vitamin B12 and folate intake.\n• Stay hydrated and exercise regularly."
+            is_high_risk = False
+        elif risk_pct < 60:
+            diagnosis    = "Moderate Risk - Possible Anemia"
+            advice       = "• Increase iron-rich foods: red meat, lentils, spinach, fortified cereals.\n• Pair iron foods with Vitamin C to boost absorption.\n• Get a CBC blood test to check hemoglobin levels."
+            is_high_risk = False
+        else:
+            diagnosis    = "High Risk - Anemia Likely"
+            advice       = "• Consult a doctor immediately for a complete blood count (CBC).\n• Iron supplements may be required under medical supervision.\n• Avoid tea/coffee with meals as they block iron absorption."
+            is_high_risk = True
+
+        return jsonify({
+            "risk_percentage": risk_pct,
+            "diagnosis":       diagnosis,
+            "advice":          advice,
+            "is_high_risk":    is_high_risk,
+            "model_info":      "Cloud Anemia Model"
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 400
+
+
 if __name__ == '__main__':
-    # Run the Flask app on all interfaces at port 5000
     app.run(host='0.0.0.0', port=5000, debug=True)
