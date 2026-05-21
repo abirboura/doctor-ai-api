@@ -76,6 +76,7 @@ def health_check():
     })
 
 @app.route('/predict/diabetes', methods=['POST'])
+@app.route('/predict/diabetes.pkl', methods=['POST'])
 def predict_diabetes():
     if not diabetes_model:
         return jsonify({"error": "Diabetes model not loaded on server."}), 500
@@ -165,6 +166,7 @@ def predict_diabetes():
 
 
 @app.route('/predict/blood_pressure', methods=['POST'])
+@app.route('/predict/blood_pressure.pkl', methods=['POST'])
 def predict_blood_pressure():
     if not bp_model:
         return jsonify({"error": "Blood Pressure model not loaded on server."}), 500
@@ -239,6 +241,7 @@ def predict_blood_pressure():
 
 
 @app.route('/predict/cardio', methods=['POST'])
+@app.route('/predict/cardio.pkl', methods=['POST'])
 def predict_cardio():
     if not cardio_model:
         return jsonify({"error": "Cardio model not loaded on server."}), 500
@@ -370,6 +373,7 @@ def get_base_inputs(data):
 # NEW ROUTE — Calcium
 # ==========================================
 @app.route('/predict/calcium', methods=['POST'])
+@app.route('/predict/calcium.pkl', methods=['POST'])
 def predict_calcium():
     if not calcium_model:
         return jsonify({"error": "Calcium model not loaded on server."}), 500
@@ -414,6 +418,7 @@ def predict_calcium():
 # NEW ROUTE — Vitamin B12
 # ==========================================
 @app.route('/predict/b12', methods=['POST'])
+@app.route('/predict/b12.pkl', methods=['POST'])
 def predict_b12():
     if not b12_model:
         return jsonify({"error": "B12 model not loaded on server."}), 500
@@ -458,6 +463,7 @@ def predict_b12():
 # NEW ROUTE — Vitamin D
 # ==========================================
 @app.route('/predict/vdd', methods=['POST'])
+@app.route('/predict/vdd.pkl', methods=['POST'])
 def predict_vdd():
     if not vdd_model:
         return jsonify({"error": "Vitamin D model not loaded on server."}), 500
@@ -511,6 +517,7 @@ def predict_vdd():
 # NEW ROUTE — Anemia
 # ==========================================
 @app.route('/predict/anemia', methods=['POST'])
+@app.route('/predict/anemia.pkl', methods=['POST'])
 def predict_anemia():
     if not anemia_model:
         return jsonify({"error": "Anemia model not loaded on server."}), 500
