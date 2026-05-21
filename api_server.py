@@ -480,24 +480,16 @@ def predict_vdd():
 
         level_map = {
             0: {"diagnosis": "Sufficient - Vitamin D levels are adequate",
-                "advice": "• Great! Keep getting regular sun exposure.
-• Maintain a diet with fatty fish, eggs, and fortified foods.
-• Recheck levels annually.",
+                "advice": "• Great! Keep getting regular sun exposure.\n• Maintain a diet with fatty fish, eggs, and fortified foods.\n• Recheck levels annually.",
                 "is_high_risk": False},
             1: {"diagnosis": "Insufficient - Vitamin D slightly low",
-                "advice": "• Increase sun exposure to 15-30 min/day.
-• Eat more Vitamin D-rich foods (salmon, tuna, fortified milk).
-• Consider a low-dose supplement (400-800 IU/day).",
+                "advice": "• Increase sun exposure to 15-30 min/day.\n• Eat more Vitamin D-rich foods (salmon, tuna, fortified milk).\n• Consider a low-dose supplement (400-800 IU/day).",
                 "is_high_risk": False},
             2: {"diagnosis": "Deficient - Vitamin D deficiency detected",
-                "advice": "• Consult your doctor for a 25-OH Vitamin D blood test.
-• A supplement of 1000-2000 IU/day is commonly recommended.
-• Maximize safe sun exposure and dietary sources.",
+                "advice": "• Consult your doctor for a 25-OH Vitamin D blood test.\n• A supplement of 1000-2000 IU/day is commonly recommended.\n• Maximize safe sun exposure and dietary sources.",
                 "is_high_risk": True},
             3: {"diagnosis": "Severely Deficient - Critical Vitamin D levels",
-                "advice": "• See a doctor immediately — severe deficiency affects bones, immunity and muscles.
-• High-dose supplementation (up to 50,000 IU/week) may be prescribed.
-• Regular monitoring of blood levels is essential.",
+                "advice": "• See a doctor immediately — severe deficiency affects bones, immunity and muscles.\n• High-dose supplementation (up to 50,000 IU/week) may be prescribed.\n• Regular monitoring of blood levels is essential.",
                 "is_high_risk": True},
         }
         result = level_map.get(predicted, level_map[0])
