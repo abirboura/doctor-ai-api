@@ -349,24 +349,41 @@ def predict_cardio():
 
 
 # ==========================================
-# SHARED HELPER — base symptoms + patient info
+# SHARED HELPER — Nutrition Models
 # ==========================================
-def get_base_inputs(data):
+def build_nutrition_input(data, overrides={}):
     patient = data.get('patient', {})
     answers = data.get('answers', {})
-    weight  = float(patient.get('weight') or 70)
-    height  = float(patient.get('height') or 170)
-    bmi     = weight / ((height / 100) ** 2) if height > 0 else 25.0
+
+    weight = float(patient.get('weight') or 70)
+    height = float(patient.get('height') or 170)
+    bmi    = weight / ((height / 100) ** 2) if height > 0 else 25.0
+
+    # القيم الافتراضية لكل الـ 18 مدخل
     base = {
-        'fatigue':     int(answers.get('fatigue',     0)),
-        'hair_loss':   int(answers.get('hair_loss',   0)),
-        'dizziness':   int(answers.get('dizziness',   0)),
-        'muscle_pain': int(answers.get('muscle_pain', 0)),
-        'numbness':    int(answers.get('numbness',    0)),
-        'Age':         float(patient.get('age') or 30),
-        'BMI':         round(bmi, 2),
+        'fatigue':                      int(answers.get('fatigue',     0)),
+        'hair_loss':                    int(answers.get('hair_loss',   0)),
+        'dizziness':                    int(answers.get('dizziness',   0)),
+        'muscle_pain':                  int(answers.get('muscle_pain', 0)),
+        'numbness':                     int(answers.get('numbness',    0)),
+        'Hemoglobin':                   float(answers.get('Hemoglobin',   13.5)),
+        'MCH':                          float(answers.get('MCH',          27.0)),
+        'MCHC':                         float(answers.get('MCHC',         32.0)),
+        'MCV':                          float(answers.get('MCV',          85.0)),
+        'ferritin':                     float(answers.get('ferritin',     50.0)),
+        'vitamin_b12':                  float(answers.get('vitamin_b12', 300.0)),
+        'calcium':                      float(answers.get('calcium',       9.5)),
+        'Vitamin D Level (ng/mL)':      float(answers.get('vitamin_d_level',    25.0)),
+        'Dietary Vitamin D (IU)':       float(answers.get('dietary_vitamin_d', 400.0)),
+        'Dietary Calcium (mg)':         float(answers.get('dietary_calcium',   800.0)),
+        'Age':                          float(patient.get('age') or 30),
+        'BMI':                          round(bmi, 2),
+        'Sun Exposure (hours/week)':    float(answers.get('sun_exposure', 5.0)),
     }
-    return base, answers, bmi
+
+    # تطبيق أي overrides خاصة بالمرض
+    base.update(overrides)
+    return pd.DataFrame([base])
 
 
 # ==========================================
@@ -378,9 +395,7 @@ def predict_calcium():
     if not calcium_model:
         return jsonify({"error": "Calcium model not loaded on server."}), 500
     try:
-        base, answers, _ = get_base_inputs(request.json)
-        base['calcium'] = float(answers.get('calcium', 9.5))
-        input_df = pd.DataFrame([base])
+        input_df = build_nutrition_input(request.json)
 
         if hasattr(calcium_model, 'predict_proba'):
             prob = float(calcium_model.predict_proba(input_df)[0][1])
@@ -423,9 +438,7 @@ def predict_b12():
     if not b12_model:
         return jsonify({"error": "B12 model not loaded on server."}), 500
     try:
-        base, answers, _ = get_base_inputs(request.json)
-        base['vitamin_b12'] = float(answers.get('vitamin_b12', 300.0))
-        input_df = pd.DataFrame([base])
+        input_df = build_nutrition_input(request.json)
 
         if hasattr(b12_model, 'predict_proba'):
             prob = float(b12_model.predict_proba(input_df)[0][1])
@@ -468,13 +481,7 @@ def predict_vdd():
     if not vdd_model:
         return jsonify({"error": "Vitamin D model not loaded on server."}), 500
     try:
-        base, answers, _ = get_base_inputs(request.json)
-        base['Vitamin D Level (ng/mL)']  = float(answers.get('vitamin_d_level',    25.0))
-        base['Dietary Vitamin D (IU)']   = float(answers.get('dietary_vitamin_d', 400.0))
-        base['Dietary Calcium (mg)']     = float(answers.get('dietary_calcium',   800.0))
-        base['Sun Exposure (hours/week)']= float(answers.get('sun_exposure',        5.0))
-        base['calcium']                  = float(answers.get('calcium',             9.5))
-        input_df = pd.DataFrame([base])
+        input_df = build_nutrition_input(request.json)
 
         if hasattr(vdd_model, 'predict_proba'):
             probas     = vdd_model.predict_proba(input_df)[0]
@@ -522,12 +529,7 @@ def predict_anemia():
     if not anemia_model:
         return jsonify({"error": "Anemia model not loaded on server."}), 500
     try:
-        base, answers, _ = get_base_inputs(request.json)
-        base['Hemoglobin'] = float(answers.get('Hemoglobin', 13.5))
-        base['MCHC']       = float(answers.get('MCHC',       32.0))
-        base['MCV']        = float(answers.get('MCV',        85.0))
-        base['ferritin']   = float(answers.get('ferritin',   50.0))
-        input_df = pd.DataFrame([base])
+        input_df = build_nutrition_input(request.json)
 
         if hasattr(anemia_model, 'predict_proba'):
             prob = float(anemia_model.predict_proba(input_df)[0][1])
