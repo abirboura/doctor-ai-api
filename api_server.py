@@ -55,6 +55,7 @@ calcium_model  = load_model('model_calcium.pkl')   # ← جديد
 b12_model      = load_model('model_b12.pkl')        # ← جديد
 vdd_model      = load_model('model_vdd.pkl')        # ← جديد
 anemia_model   = load_model('model_anemia.pkl')     # ← جديد
+iron_model     = load_model('model_iron.pkl')       # ← جديد
 
 # ==========================================
 # ROUTES
@@ -72,6 +73,7 @@ def health_check():
             "b12":            b12_model is not None,
             "vitamin_d":      vdd_model is not None,
             "anemia":         anemia_model is not None,
+            "iron":           iron_model is not None,
         }
     })
 
@@ -557,6 +559,49 @@ def predict_anemia():
             "advice":          advice,
             "is_high_risk":    is_high_risk,
             "model_info":      "Cloud Anemia Model"
+        })
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 400
+
+
+# ==========================================
+# NEW ROUTE — Iron Deficiency (Ferritin)
+# ==========================================
+@app.route('/predict/iron', methods=['POST'])
+@app.route('/predict/iron.pkl', methods=['POST'])
+def predict_iron():
+    if not iron_model:
+        return jsonify({"error": "Iron model not loaded on server."}), 500
+    try:
+        input_df = build_nutrition_input(request.json)
+
+        if hasattr(iron_model, 'predict_proba'):
+            prob = float(iron_model.predict_proba(input_df)[0][1])
+        else:
+            prob = float(iron_model.predict(input_df)[0])
+
+        risk_pct = round(prob * 100, 1)
+
+        if risk_pct < 30:
+            diagnosis    = "Normal - Iron levels likely adequate"
+            advice       = "• Maintain a diet rich in iron (red meat, spinach, legumes).\n• Pair iron-rich foods with Vitamin C to boost absorption.\n• Stay hydrated and exercise regularly."
+            is_high_risk = False
+        elif risk_pct < 60:
+            diagnosis    = "Moderate Risk - Possible Iron Deficiency"
+            advice       = "• Increase iron-rich foods: red meat, lentils, spinach, fortified cereals.\n• Get a ferritin blood test to confirm iron levels.\n• Avoid tea/coffee with meals as they block iron absorption."
+            is_high_risk = False
+        else:
+            diagnosis    = "High Risk - Iron Deficiency Likely"
+            advice       = "• Consult a doctor immediately for a full iron panel.\n• Iron supplements may be required under medical supervision.\n• Avoid calcium-rich foods alongside iron supplements."
+            is_high_risk = True
+
+        return jsonify({
+            "risk_percentage": risk_pct,
+            "diagnosis":       diagnosis,
+            "advice":          advice,
+            "is_high_risk":    is_high_risk,
+            "model_info":      "Cloud Iron Model"
         })
     except Exception as e:
         print(traceback.format_exc())
