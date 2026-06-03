@@ -51,11 +51,11 @@ def load_model(filename):
 diabetes_model = load_model('best_diabetes_model.pkl')
 bp_model       = load_model('best_model.pkl')
 cardio_model   = load_model('cardio_model.pkl')
-calcium_model  = load_model('model_calcium.pkl')   # ← جديد
-b12_model      = load_model('model_b12.pkl')        # ← جديد
-vdd_model      = load_model('model_vdd.pkl')        # ← جديد
-anemia_model   = load_model('model_anemia.pkl')     # ← جديد
-iron_model     = load_model('model_iron.pkl')       # ← جديد
+calcium_model  = load_model('model_calcium.pkl')
+b12_model      = load_model('model_b12.pkl')
+vdd_model      = load_model('model_vdd.pkl')
+anemia_model   = load_model('model_anemia.pkl')
+iron_model     = load_model('model_iron.pkl')
 
 # ==========================================
 # ROUTES
@@ -231,10 +231,10 @@ def predict_blood_pressure():
 
         return jsonify({
             "risk_percentage": risk_pct,
-            "diagnosis": diagnosis,
-            "advice": advice,
-            "is_high_risk": is_high_risk,
-            "model_info": "Cloud Heart Model"
+            "diagnosis":       diagnosis,
+            "advice":          advice,
+            "is_high_risk":    is_high_risk,
+            "model_info":      "Cloud Heart Model"
         })
 
     except Exception as e:
@@ -270,7 +270,9 @@ def predict_cardio():
         height     = float(patient_info.get('height') or 170)
         weight     = float(patient_info.get('weight') or 70)
         gender_str = str(patient_info.get('gender') or 'Male')
-        gender     = 1 if gender_str.lower() == 'male' else 2
+        
+        # 1. تصحيح ترميز الجنس (الذكر = 2، الأنثى = 1)
+        gender = 2 if gender_str.lower() == 'male' else 1
 
         ap_hi       = float(cardio_data.get('ap_hi', 120))
         ap_lo       = float(cardio_data.get('ap_lo', 80))
@@ -284,20 +286,29 @@ def predict_cardio():
         pulse_pressure = ap_hi - ap_lo
         map_val = (ap_hi + 2 * ap_lo) / 3
 
-        if age_years < 35:   age_group = 1
-        elif age_years < 45: age_group = 2
-        elif age_years < 55: age_group = 3
-        elif age_years < 65: age_group = 4
-        else:                age_group = 5
+        # 2. تصحيح فئات العمر لتطابق التدريب تماماً
+        if age_years <= 40:   age_group = 1
+        elif age_years <= 50: age_group = 2
+        elif age_years <= 55: age_group = 3
+        elif age_years <= 60: age_group = 4
+        else:                 age_group = 5
 
-        if bmi < 18.5:    bmi_category = 1
-        elif bmi < 25.0:  bmi_category = 2
-        elif bmi < 30.0:  bmi_category = 3
-        else:             bmi_category = 4
+        # 3. تصحيح فئات كتلة الجسم لتطابق التدريب تماماً
+        if bmi <= 18.5:    bmi_category = 1
+        elif bmi <= 25.0:  bmi_category = 2
+        elif bmi <= 30.0:  bmi_category = 3
+        else:              bmi_category = 4
 
         hypertension = 1 if (ap_hi >= 140 or ap_lo >= 90) else 0
         age_chol = age_years * cholesterol
         bp_age   = ap_hi * age_years
+
+        # 4. الترتيب الصحيح والمعتمد للأعمدة كما تدرب عليها الموديل في الـ Notebook
+        feature_order = [
+            'gender', 'height', 'weight', 'ap_hi', 'ap_lo', 'cholesterol', 'gluc', 
+            'smoke', 'alco', 'active', 'age_years', 'bmi', 'pulse_pressure', 'map', 
+            'age_group', 'bmi_category', 'hypertension', 'age_chol', 'bp_age'
+        ]
 
         input_df = pd.DataFrame([{
             'age_years': age_years, 'gender': gender, 'height': height, 'weight': weight,
@@ -308,12 +319,8 @@ def predict_cardio():
             'age_chol': round(age_chol, 2), 'bp_age': round(bp_age, 2),
         }])
 
-        if hasattr(cardio_model, 'feature_names_in_'):
-            expected = list(cardio_model.feature_names_in_)
-            input_df = input_df[expected]
-        elif hasattr(cardio_model, 'get_booster'):
-            feature_names = cardio_model.get_booster().feature_names
-            if feature_names: input_df = input_df[feature_names]
+        # إعادة ترتيب الأعمدة إجبارياً ليتطابق مع مصفوفة التدريب
+        input_df = input_df[feature_order]
 
         if hasattr(cardio_model, 'predict_proba'):
             probas = cardio_model.predict_proba(input_df)
@@ -339,10 +346,10 @@ def predict_cardio():
 
         return jsonify({
             "risk_percentage": risk_pct,
-            "diagnosis": diagnosis,
-            "advice": advice,
-            "is_high_risk": is_high_risk,
-            "model_info": "Cloud Cardio Model"
+            "diagnosis":       diagnosis,
+            "advice":          advice,
+            "is_high_risk":    is_high_risk,
+            "model_info":      "Cloud Cardio Model"
         })
 
     except Exception as e:
@@ -361,7 +368,6 @@ def build_nutrition_input(data, overrides={}):
     height = float(patient.get('height') or 170)
     bmi    = weight / ((height / 100) ** 2) if height > 0 else 25.0
 
-    # القيم الافتراضية لكل الـ 18 مدخل
     base = {
         'fatigue':                      int(answers.get('fatigue',     0)),
         'hair_loss':                    int(answers.get('hair_loss',   0)),
@@ -383,7 +389,6 @@ def build_nutrition_input(data, overrides={}):
         'Sun Exposure (hours/week)':    float(answers.get('sun_exposure', 5.0)),
     }
 
-    # تطبيق أي overrides خاصة بالمرض
     base.update(overrides)
     return pd.DataFrame([base])
 
