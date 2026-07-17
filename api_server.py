@@ -37,17 +37,23 @@ __main__.create_pattern_features = create_pattern_features
 # ==========================================
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "appai")
 
+import traceback
 def load_model(filename):
     path = os.path.join(MODELS_DIR, filename)
-    if os.path.exists(path):
-        try:
-            return joblib.load(path)
-        except Exception as e:
-            print(f"Error loading {filename}: {e}")
-            return None
-    print(f"Model not found: {path}")
-    return None
 
+    print(f"Loading: {path}")
+
+    try:
+        model = joblib.load(path)
+        print(f"Successfully loaded: {filename}")
+        return model
+
+    except Exception as e:
+        print(f"ERROR loading {filename}")
+        print(type(e).__name__)
+        print(e)
+        traceback.print_exc()
+        return None
 diabetes_model = load_model('best_diabetes_model.pkl')
 bp_model       = load_model('best_model.pkl')
 cardio_model   = load_model('cardio_model.pkl')
